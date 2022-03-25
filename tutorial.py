@@ -1,12 +1,16 @@
 from onnx_pytorch import code_gen
 #code_gen.gen("resnet18-v2-7.onnx", "./")
-code_gen.gen("/workspace/develop/test/resnet.before_absorb_bn.onnx", "/workspace/develop/test/res")
+# code_gen.gen("/workspace/develop/test/resnet.before_absorb_bn.onnx", "/workspace/develop/test/res")
 
 import numpy as np
 import onnx
 import onnxruntime
 import torch
+import sys
+
 torch.set_printoptions(8)
+
+sys.path.append('/workspace/results/resnet50_w8a8.adaquant')
 
 from model import Model
 
@@ -16,7 +20,7 @@ inp = np.random.randn(1, 3, 224, 224).astype(np.float32)
 with torch.no_grad():
   torch_outputs = model(torch.from_numpy(inp))
 
-onnx_model = onnx.load("resnet18-v2-7.onnx")
+onnx_model = onnx.load("/workspace/results/resnet50_w8a8.adaquant/resnet.before_absorb_bn.onnx")
 sess_options = onnxruntime.SessionOptions()
 session = onnxruntime.InferenceSession(onnx_model.SerializeToString(),
                                        sess_options)

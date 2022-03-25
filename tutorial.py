@@ -1,5 +1,6 @@
 from onnx_pytorch import code_gen
-code_gen.gen("resnet18-v2-7.onnx", "./")
+#code_gen.gen("resnet18-v2-7.onnx", "./")
+code_gen.gen("/workspace/develop/test/resnet.before_absorb_bn.onnx", "/workspace/develop/test/res")
 
 import numpy as np
 import onnx

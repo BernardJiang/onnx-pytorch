@@ -153,11 +153,12 @@ def test_run_model(inputs=[{', '.join(numpy_input_str)}]):''',
   '''.join(test_run_model)
 
   def preprocess_onnx_model(self):
+    invalidchars="[:/.\s\(\),]"
     for n in self.onnx_model.graph.node:
       inputs, outputs = [], []
       for ls, f in ((inputs, n.input), (outputs, n.output)):
         for i in f:
-          new_i = re.sub("[:/.]", "_", i)
+          new_i = re.sub(invalidchars, "_", i)
           ls.append(new_i)
           if i != ls[-1] and not self.rename_helper.simplify_names:
             logging.info(f"Tensor name {i} is changed to {ls[-1]}.")
@@ -169,7 +170,7 @@ def test_run_model(inputs=[{', '.join(numpy_input_str)}]):''',
       n.output.extend(outputs)
 
       old_name = n.name
-      n.name = re.sub("[:/.]", "_", n.name)
+      n.name = re.sub(invalidchars, "_", n.name)
       if old_name != n.name and not self.rename_helper.simplify_names:
         logging.info(f"Node name {old_name} is changed to {n.name}.")
       self.rename_helper.node_name_counter[n.name] += 1
@@ -178,7 +179,7 @@ def test_run_model(inputs=[{', '.join(numpy_input_str)}]):''',
               self.onnx_model.graph.initializer):
       for i in f:
         old_name = i.name
-        i.name = re.sub("[:/.]", "_", i.name)
+        i.name = re.sub(invalidchars, "_", i.name)
         if old_name != i.name and not self.rename_helper.simplify_names:
           logging.info(f"Tensor name {i.name} is changed to {i.name}.")
         self.rename_helper.tensor_name_counter[i.name] += 1
@@ -204,7 +205,7 @@ def test_run_model(inputs=[{', '.join(numpy_input_str)}]):''',
       for f in (self.onnx_model.graph.value_info,):
         for i in f:
           old_name = i.name
-          i.name = re.sub("[:/.]", "_", i.name)
+          i.name = re.sub(invalidchars, "_", i.name)
           if old_name != i.name and not self.rename_helper.simplify_names:
             logging.info(f"Tensor name {i.name} is changed to {i.name}.")
           self.rename_helper.tensor_name_counter[i.name] += 1

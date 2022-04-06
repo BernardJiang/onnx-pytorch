@@ -35,13 +35,12 @@ for p in subfolders2:
                                        sess_options)
     
     input_shapes = [[d.dim_value for d in _input.type.tensor_type.shape.dim] for _input in onnx_model.graph.input]
-    if len(input_shapes) > 1:
-        print("warning : more than 1 input")
+
+
     inps = [np.random.randn(*i).astype(np.float32) for i in input_shapes]
 
-    inputs = {}
-    for i in range(len(inps)):
-        inputs[session.get_inputs()[i].name] =  inps[i]
+    inputs = { session.get_inputs()[i].name : inps[i] for i in range(len(inps)) }
+
         
     ort_outputs = session.run(None, inputs)
     

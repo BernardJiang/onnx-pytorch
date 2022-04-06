@@ -14,11 +14,13 @@ subfolders = [ f.path for f in os.scandir(onnx_source_folder) if f.is_dir() ]
 
 p = pathlib.Path(onnx_source_folder)
 # All subdirectories in the current directory, not recursive.
-subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
+# subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
+subfolders2 = ['model_2056_4d0aa1_nocut']
 
 # subfolders2.remove("model_243_59bb8f_nocut")
 sys.path.append(o2p_dst_folder)
 # dstfolders = [os.path.join(o2p_dst_folder, f) for f in subfolders2]
+
 for p in subfolders2:
     srcf = os.path.join(onnx_source_folder, p, 'input', p+'.origin.onnx')
     dstf = os.path.join(o2p_dst_folder, p)
@@ -35,9 +37,12 @@ for p in subfolders2:
     input_shapes = [[d.dim_value for d in _input.type.tensor_type.shape.dim] for _input in onnx_model.graph.input]
     if len(input_shapes) > 1:
         print("warning : more than 1 input")
-    inp = np.random.randn(*input_shapes[0]).astype(np.float32)    
+    inps = [np.random.randn(*i).astype(np.float32) for i in input_shapes]
 
-    inputs = {session.get_inputs()[0].name: inp}
+    inputs = {}
+    for i in range(len(inps)):
+        inputs[session.get_inputs()[i].name] =  inps[i]
+        
     ort_outputs = session.run(None, inputs)
     
     # pytorch inference
@@ -46,7 +51,8 @@ for p in subfolders2:
     pytorch_model = mod.Model()
     pytorch_model.eval()
     with torch.no_grad():
-        torch_outputs = pytorch_model(torch.from_numpy(inp))
+        tor_inps = [torch.from_numpy(i) for i in inps]
+        torch_outputs = pytorch_model(*tor_inps)
 
     print(
         "Comparison result:", p, 

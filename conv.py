@@ -10,17 +10,18 @@ import importlib
 
 onnx_source_folder = '/workspace/develop/model_source/big_model/model_share_0923_opset11/'
 o2p_dst_folder = '/workspace/develop/o2p_models/'
+
+sys.path.append(o2p_dst_folder)
+
 subfolders = [ f.path for f in os.scandir(onnx_source_folder) if f.is_dir() ] 
 
 p = pathlib.Path(onnx_source_folder)
 # All subdirectories in the current directory, not recursive.
 # subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
-subfolders2 = ['model_2056_4d0aa1_nocut']
+# subfolders2 = ['model_216_294e55_cut_sigmoid', 'model_215_135555_cut_sigmoid', 'model_094_9e8715_cut_sigmoid', 'model_211_c2b850_nocut', 'model_212_0c51ee_nocut', 'model_220_d31163_nocut', 'model_211_c2b850_cut_sigmoid', 'model_223_da3b11_cut_sigmoid', 'model_215_135555_nocut', 'model_228_099330_cut_sigmoid', 'model_073_70211d_nocut', 'model_093_68cdc5_nocut', 'model_073_70211d_cut_sigmoid', 'model_021_0105ae_nocut', 'model_234_9e7e66_cut_sigmoid', 'model_252_099330_cut_sigmoid', 'model_212_0c51ee_cut_sigmoid', 'model_220_d31163_cut_sigmoid', 'model_223_da3b11_nocut', 'model_094_9e8715_nocut', 'model_235_0873f9_nocut', 'model_216_294e55_nocut', 'model_225_4c8c3f_cut_sigmoid', 'model_252_099330_nocut', 'model_093_68cdc5_cut_sigmoid', 'model_235_0873f9_cut_sigmoid', 'model_228_099330_nocut', 'model_225_4c8c3f_nocut', 'model_234_9e7e66_nocut']
+subfolders2 = ['model_073_70211d_nocut']
 
-# subfolders2.remove("model_243_59bb8f_nocut")
-sys.path.append(o2p_dst_folder)
-# dstfolders = [os.path.join(o2p_dst_folder, f) for f in subfolders2]
-
+failed_cases = []
 for p in subfolders2:
     srcf = os.path.join(onnx_source_folder, p, 'input', p+'.origin.onnx')
     dstf = os.path.join(o2p_dst_folder, p)
@@ -52,12 +53,17 @@ for p in subfolders2:
     with torch.no_grad():
         tor_inps = [torch.from_numpy(i) for i in inps]
         torch_outputs = pytorch_model(*tor_inps)
+        
+    test_result = np.allclose(torch_outputs[0].detach().numpy(),
+        ort_outputs[0],
+        atol=1e-3,
+        rtol=1e-3)        
 
-    print(
-        "Comparison result:", p, 
-        np.allclose(torch_outputs[0].detach().numpy(),
-                ort_outputs[0],
-                atol=1e-5,
-                rtol=1e-5))
-
-    # sys.path.remove(dstf)
+    absdiff = abs(torch_outputs[0].detach().numpy()-ort_outputs[0]).max()
+    print("Comparison result:", p, test_result, absdiff)
+ 
+    if not test_result:
+        failed_cases.append(p)
+        
+print("total cases: ", len(subfolders2), " failed cases: ", len(failed_cases), ". ratio: ", len(failed_cases) / len(subfolders2))    
+print("Failed cases: ",  failed_cases)    

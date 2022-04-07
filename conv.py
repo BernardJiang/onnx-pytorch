@@ -7,11 +7,60 @@ import os
 import pathlib 
 from onnx_pytorch import code_gen
 import importlib
+from torch.onnx import ONNX_ARCHIVE_MODEL_PROTO_NAME, ExportTypes, OperatorExportTypes, TrainingMode
 
 onnx_source_folder = '/workspace/develop/model_source/big_model/model_share_0923_opset11/'
 o2p_dst_folder = '/workspace/develop/o2p_models/'
 
 sys.path.append(o2p_dst_folder)
+
+
+def save2onnx(model_orig, img, onnx_export_file, disable_quantization=False):
+    
+    try:
+        
+        # if disable_quantization:
+            # disable quantization before saving to onnx.
+            # for m in model_orig.modules():
+                # if isinstance(m, QConv2d) or isinstance(m, QLinear):
+                    # m.quantize = False
+            # qparams = get_quantized_model_and_params(model_orig)
+            # filename_json = onnx_export_file + ".json"
+            # with open(filename_json, "w") as fp:
+                # json.dump(qparams, fp, indent=4)
+
+        # onnx_export_file = result_folder+'mobilenetv2_zeroq.onnx'
+        print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
+        print('****onnx file****',onnx_export_file)
+        model_orig.eval()
+        # model = copy.deepcopy(model_orig)
+        model = model_orig
+        # for name, param in model.named_parameters():
+        #     print("name = ", name)
+        #     param.requires_grad = False 
+        # img = torch.zeros((1, 3, 224, 224))
+        model.eval()
+        y = model(*img)  # dry run
+        # torch.onnx.export(  output_names=['classes', 'boxes'] if y is None else ['output'])
+        torch.onnx.export(model,               # model being run
+                            *img,                         # model input (or a tuple for multiple inputs)
+                            onnx_export_file,   # where to save the model (can be a file or file-like object)
+                            export_params=True,        # store the trained parameter weights inside the model file
+                            opset_version=11,          # the ONNX version to export the model to
+                            do_constant_folding=False,  # whether to execute constant folding for optimization
+                            input_names = ['images'],   # the model's input names
+                            output_names = ['classes', 'boxes'] if y is None else ['output'], # the model's output names
+                            training=TrainingMode.PRESERVE,
+                            keep_initializers_as_inputs=True,
+                            verbose=False
+        )     # Checks
+        onnx_model = onnx.load(onnx_export_file)  # load onnx model
+        onnx.checker.check_model(onnx_model)  # check onnx model
+        # print(onnx.helper.printable_graph(onnx_model.graph))  # print a human readable model
+        print('ONNX export success, saved as %s' % onnx_export_file)
+    except Exception as e:
+        print('ONNX export failure: %s' % e)
+
 
 subfolders = [ f.path for f in os.scandir(onnx_source_folder) if f.is_dir() ] 
 
@@ -27,7 +76,7 @@ for p in subfolders2:
     dstf = os.path.join(o2p_dst_folder, p)
     pathlib.Path(dstf).mkdir(parents=True, exist_ok=True) 
     # print(srcf, " => ", dstf)
-    # code_gen.gen(srcf, dstf, simplify_names=True)
+    # code_gen.gen(srcf, dstf) #, simplify_names=True)
     
     #onnx inference
     onnx_model = onnx.load(srcf)
@@ -64,6 +113,10 @@ for p in subfolders2:
  
     if not test_result:
         failed_cases.append(p)
+        
+        #save pytorch to onnx 
+        onnxfile = dstf + "/" + p + ".onnx"
+        save2onnx(pytorch_model, tor_inps, onnxfile)
         
 print("total cases: ", len(subfolders2), " failed cases: ", len(failed_cases), ". ratio: ", len(failed_cases) / len(subfolders2))    
 print("Failed cases: ",  failed_cases)    

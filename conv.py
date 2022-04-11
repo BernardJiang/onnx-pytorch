@@ -14,6 +14,24 @@ o2p_dst_folder = '/workspace/develop/o2p_models/'
 
 sys.path.append(o2p_dst_folder)
 
+def compare2onnx(onnx_model, onnx_model2):
+    for (f, f2) in zip(onnx_model.graph.input, onnx_model2.graph.input):
+        if f.type != f2.type: 
+            print("Input Diff: ", f, f2)
+                 
+    for (f, f2) in zip(onnx_model.graph.output, onnx_model2.graph.output):
+        if f.type != f2.type: 
+            print("Output Diff: ", f, f2)
+                 
+    for (f, f2) in zip(onnx_model.graph.initializer, onnx_model2.graph.initializer):
+        if f.type != f2.type: 
+            print("initializer Diff: ", f, f2)                        
+            
+    for (f, f2) in zip(onnx_model.graph.node, onnx_model2.graph.node):
+        if f.type != f2.type: 
+            print("node Diff: ", f, f2)                        
+            
+ 
 
 def save2onnx(model_orig, img, onnx_export_file, disable_quantization=False):
     
@@ -66,9 +84,9 @@ subfolders = [ f.path for f in os.scandir(onnx_source_folder) if f.is_dir() ]
 
 p = pathlib.Path(onnx_source_folder)
 # All subdirectories in the current directory, not recursive.
-# subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
+subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
 # subfolders2 = ['model_216_294e55_cut_sigmoid', 'model_215_135555_cut_sigmoid', 'model_094_9e8715_cut_sigmoid', 'model_211_c2b850_nocut', 'model_212_0c51ee_nocut', 'model_220_d31163_nocut', 'model_211_c2b850_cut_sigmoid', 'model_223_da3b11_cut_sigmoid', 'model_215_135555_nocut', 'model_228_099330_cut_sigmoid', 'model_073_70211d_nocut', 'model_093_68cdc5_nocut', 'model_073_70211d_cut_sigmoid', 'model_021_0105ae_nocut', 'model_234_9e7e66_cut_sigmoid', 'model_252_099330_cut_sigmoid', 'model_212_0c51ee_cut_sigmoid', 'model_220_d31163_cut_sigmoid', 'model_223_da3b11_nocut', 'model_094_9e8715_nocut', 'model_235_0873f9_nocut', 'model_216_294e55_nocut', 'model_225_4c8c3f_cut_sigmoid', 'model_252_099330_nocut', 'model_093_68cdc5_cut_sigmoid', 'model_235_0873f9_cut_sigmoid', 'model_228_099330_nocut', 'model_225_4c8c3f_nocut', 'model_234_9e7e66_nocut']
-subfolders2 = ['model_073_70211d_nocut']
+# subfolders2 = ['model_073_70211d_nocut']
 
 failed_cases = []
 for p in subfolders2:
@@ -76,7 +94,7 @@ for p in subfolders2:
     dstf = os.path.join(o2p_dst_folder, p)
     pathlib.Path(dstf).mkdir(parents=True, exist_ok=True) 
     # print(srcf, " => ", dstf)
-    # code_gen.gen(srcf, dstf) #, simplify_names=True)
+    code_gen.gen(srcf, dstf, simplify_names=True)
     
     #onnx inference
     onnx_model = onnx.load(srcf)
@@ -114,9 +132,28 @@ for p in subfolders2:
     if not test_result:
         failed_cases.append(p)
         
+        ptfile = dstf + "/" + p + ".pt"
+        torch.save(pytorch_model.state_dict(),ptfile)
+        
         #save pytorch to onnx 
         onnxfile = dstf + "/" + p + ".onnx"
-        save2onnx(pytorch_model, tor_inps, onnxfile)
+        # save2onnx(pytorch_model, tor_inps, onnxfile)
+        
+        onnx_model2 = onnx.load(onnxfile)
+        sess_options2 = onnxruntime.SessionOptions()
+        session2 = onnxruntime.InferenceSession(onnx_model2.SerializeToString(),
+                                       sess_options2)
+        ort_outputs2 = session.run(None, inputs)
+        test_result2 = np.allclose(ort_outputs[0],
+            ort_outputs2[0],
+            atol=1e-3,
+            rtol=1e-3)        
+
+        absdiff2 = abs(torch_outputs[0].detach().numpy()-ort_outputs[0]).max()
+        print("Comparison result onnx vs onnx:", p, test_result2, absdiff2)
+        compare2onnx(onnx_model, onnx_model2)
+    
+    
         
 print("total cases: ", len(subfolders2), " failed cases: ", len(failed_cases), ". ratio: ", len(failed_cases) / len(subfolders2))    
 print("Failed cases: ",  failed_cases)    

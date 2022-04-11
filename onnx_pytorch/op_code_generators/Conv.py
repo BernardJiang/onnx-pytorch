@@ -26,8 +26,16 @@ class ConvOpCodeGenerator(OpCodeGenerator):
     node_name = self.rename_helper.get_node_name(node.name, node.op_type)
     init_str, forward_str = [], []
     padding = 0
-    if "pads" in attr_value_dict:
-      padding = [attr_value_dict["pads"][i] for i in range(d)]
+    if "pads" in attr_value_dict:   
+      padding = attr_value_dict["pads"]
+      if len(padding) == 4 and (padding[0] != padding[2] or padding[1] != padding[3]) :
+        print("add pad for odd padding")        
+        nn_name = "KConv2d"
+        # swap 2 elements to suit pytorch order from onnx order.
+        get = padding[1], padding[2]
+        padding[2], padding[1] = get
+      else:
+        padding = [attr_value_dict["pads"][i] for i in range(d)]    
     elif attr_value_dict["auto_pad"] not in (b"NOTSET", b""):
       logging.warning(
           "auto_pad is a DEPRECATED attribute, will not guarantee the result.")
@@ -45,7 +53,10 @@ class ConvOpCodeGenerator(OpCodeGenerator):
         in_channels=weights.shape[1] * attr_value_dict["group"],
         bias=len(node.input) > 2)
 
-    init_str.append(f"self.{node_name} = nn.{nn_name}(**{{{params_str}}})")
+    if nn_name == "KConv2d":
+      init_str.append(f"self.{node_name} = {nn_name}(**{{{params_str}}})")
+    else:
+      init_str.append(f"self.{node_name} = nn.{nn_name}(**{{{params_str}}})")
     init_str.append(f"self.{node_name}.weight.data = {inputs_str[1]}")
     if len(node.input) > 2:
       init_str.append(f"self.{node_name}.bias.data = {inputs_str[2]}")

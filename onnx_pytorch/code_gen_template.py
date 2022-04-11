@@ -16,6 +16,28 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+
+class KConv2d(nn.Conv2d):
+    #docstring for KConv2d.
+
+    def __init__(self, in_channels, out_channels, kernel_size,
+                 stride=1, padding=0, dilation=1, groups=1, bias=True):
+        zeropadding = (0,0)
+        padding_ = padding
+        super(KConv2d, self).__init__(in_channels, out_channels, kernel_size,
+                                      stride, (0, 0), dilation, groups, bias)
+        self.zeropad2d = nn.ZeroPad2d(padding)
+        
+    def _padded_forward(self, input):
+        padinput = self.zeropad2d(input)
+        bias = self.bias.data if self.bias else None
+        output = F.conv2d(padinput, self.weight.data, bias, self.stride,
+                        self.padding, self.dilation, self.groups)        
+        return output
+      
+    def forward(self, input):
+        return self._padded_forward(input)
+        
 '''
 
   @classmethod

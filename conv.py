@@ -134,7 +134,11 @@ for p in subfolders2:
     mod = importlib.import_module(p+".model")
     # from model import Model            
     pytorch_model_1 = mod.Model()
-    pytorch_model = transform(pytorch_model_1)
+    pytorch_model_2 = transform(pytorch_model_1)
+    pytorch_model_2.to_folder(dstf, "transformed_model")
+    mod_2 = importlib.import_module(p+".module")
+    pytorch_model = mod_2.transformed_model()
+    
     pytorch_model.eval()
     with torch.no_grad():
         tor_inps = [torch.from_numpy(i) for i in inps]

@@ -2,6 +2,7 @@ import numpy as np
 import onnx
 import onnxruntime
 import torch
+import torch.fx
 import sys
 import os
 import pathlib 
@@ -13,6 +14,23 @@ onnx_source_folder = '/workspace/develop/model_source/big_model/model_share_0923
 o2p_dst_folder = '/workspace/develop/o2p_models/'
 
 sys.path.append(o2p_dst_folder)
+
+
+def transform(m: torch.nn.Module,
+              tracer_class : type = torch.fx.Tracer) -> torch.nn.Module:
+    # Step 1: Acquire a Graph representing the code in `m`
+
+    # NOTE: torch.fx.symbolic_trace is a wrapper around a call to
+    # fx.Tracer.trace and constructing a GraphModule. We'll
+    # split that out in our transform to allow the caller to
+    # customize tracing behavior.
+    graph : torch.fx.Graph = tracer_class().trace(m)
+
+    # Step 2: Modify this Graph or create a new one
+    # graph = ...
+
+    # Step 3: Construct a Module to return
+    return torch.fx.GraphModule(m, graph)
 
 def compare2onnx(onnx_model, onnx_model2):
     for (f, f2) in zip(onnx_model.graph.input, onnx_model2.graph.input):
@@ -84,9 +102,9 @@ subfolders = [ f.path for f in os.scandir(onnx_source_folder) if f.is_dir() ]
 
 p = pathlib.Path(onnx_source_folder)
 # All subdirectories in the current directory, not recursive.
-subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
+# subfolders2 =  [f.name for f in p.iterdir() if f.is_dir()]
 # subfolders2 = ['model_216_294e55_cut_sigmoid', 'model_215_135555_cut_sigmoid', 'model_094_9e8715_cut_sigmoid', 'model_211_c2b850_nocut', 'model_212_0c51ee_nocut', 'model_220_d31163_nocut', 'model_211_c2b850_cut_sigmoid', 'model_223_da3b11_cut_sigmoid', 'model_215_135555_nocut', 'model_228_099330_cut_sigmoid', 'model_073_70211d_nocut', 'model_093_68cdc5_nocut', 'model_073_70211d_cut_sigmoid', 'model_021_0105ae_nocut', 'model_234_9e7e66_cut_sigmoid', 'model_252_099330_cut_sigmoid', 'model_212_0c51ee_cut_sigmoid', 'model_220_d31163_cut_sigmoid', 'model_223_da3b11_nocut', 'model_094_9e8715_nocut', 'model_235_0873f9_nocut', 'model_216_294e55_nocut', 'model_225_4c8c3f_cut_sigmoid', 'model_252_099330_nocut', 'model_093_68cdc5_cut_sigmoid', 'model_235_0873f9_cut_sigmoid', 'model_228_099330_nocut', 'model_225_4c8c3f_nocut', 'model_234_9e7e66_nocut']
-# subfolders2 = ['model_073_70211d_nocut']
+subfolders2 = ['model_073_70211d_nocut']
 
 failed_cases = []
 for p in subfolders2:
@@ -115,7 +133,8 @@ for p in subfolders2:
     # pytorch inference
     mod = importlib.import_module(p+".model")
     # from model import Model            
-    pytorch_model = mod.Model()
+    pytorch_model_1 = mod.Model()
+    pytorch_model = transform(pytorch_model_1)
     pytorch_model.eval()
     with torch.no_grad():
         tor_inps = [torch.from_numpy(i) for i in inps]

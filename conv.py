@@ -2,13 +2,17 @@ import numpy as np
 import onnx
 import onnxruntime
 import torch
-import torch.fx
+import torch.fx as fx
+import torch.nn as nn
 import sys
 import os
 import pathlib 
 from onnx_pytorch import code_gen
 import importlib
 from torch.onnx import ONNX_ARCHIVE_MODEL_PROTO_NAME, ExportTypes, OperatorExportTypes, TrainingMode
+from kqconv import KQConv2d
+from typing import Type, Dict, Any, Tuple, Iterable, Optional, List, cast
+import operator
 
 onnx_source_folder = '/workspace/develop/model_source/big_model/model_share_0923_opset11/'
 o2p_dst_folder = '/workspace/develop/o2p_models/'
@@ -16,6 +20,42 @@ o2p_dst_folder = '/workspace/develop/o2p_models/'
 sys.path.append(o2p_dst_folder)
 
 
+def matchType(patterntype, node: fx.Node, modules: Dict[str, Any]):
+    if not isinstance(node, fx.Node):
+        return False
+    if node.op != 'call_module':
+        return False
+    if not isinstance(node.target, str):
+        return False
+    if node.target not in modules:
+        return False
+    if type(modules[node.target]) is not patterntype:
+        return False
+    return True
+
+
+def _parent_name(target : str) -> Tuple[str, str]:
+    """
+    Splits a qualname into parent path and last atom.
+    For example, `foo.bar.baz` -> (`foo.bar`, `baz`)
+    """
+    *parent, name = target.rsplit('.', 1)
+    return parent[0] if parent else '', name
+
+def replace_node_module(node: fx.Node, modules: Dict[str, Any], new_module: torch.nn.Module):
+    assert(isinstance(node.target, str))
+    parent_name, name = _parent_name(node.target)
+    modules[node.target] = new_module
+    setattr(modules[parent_name], name, new_module)
+
+
+def old_pattern(a1):
+    return torch.nn.Conv2d(a1)
+
+# Define the replacement (same rules as the pattern)
+def replacement(w1):
+    return KQConv2d(w1)
+                
 def transform(m: torch.nn.Module,
               tracer_class : type = torch.fx.Tracer) -> torch.nn.Module:
     # Step 1: Acquire a Graph representing the code in `m`
@@ -25,12 +65,31 @@ def transform(m: torch.nn.Module,
     # split that out in our transform to allow the caller to
     # customize tracing behavior.
     graph : torch.fx.Graph = tracer_class().trace(m)
-
+    traced = fx.symbolic_trace(m)
+    modules = dict(traced.named_modules())
+    
     # Step 2: Modify this Graph or create a new one
-    # graph = ...
+    # patterns = set([nn.Conv2d, nn.Linear])
+    patterns = set([operator.add, torch.add, "add"])
+    
+    # Replace `old_pattern` with `replacement` in `traced`
+    # fx.replace_pattern(traced, old_pattern, replacement)
 
+    # Go through all the nodes in the Graph
+    for n in traced.graph.nodes:
+        # If the target matches one of the patterns
+        if any(n.target == pattern for pattern in patterns):
+            # Set the insert point, add the new node, and replace all uses
+            # of `n` with the new node
+            with traced.graph.inserting_after(n): 
+                new_node = traced.graph.call_function(torch.bitwise_and, n.args, n.kwargs)
+                n.replace_all_uses_with(new_node)
+            # Remove the old node from the graph
+            traced.graph.erase_node(n)           
+
+    traced.graph.lint()    
     # Step 3: Construct a Module to return
-    return torch.fx.GraphModule(m, graph)
+    return torch.fx.GraphModule(m, traced.graph)
 
 def compare2onnx(onnx_model, onnx_model2):
     for (f, f2) in zip(onnx_model.graph.input, onnx_model2.graph.input):
@@ -135,9 +194,10 @@ for p in subfolders2:
     # from model import Model            
     pytorch_model_1 = mod.Model()
     pytorch_model_2 = transform(pytorch_model_1)
-    pytorch_model_2.to_folder(dstf, "transformed_model")
-    mod_2 = importlib.import_module(p+".module")
-    pytorch_model = mod_2.transformed_model()
+    # pytorch_model_2.to_folder(dstf, "transformed_model")
+    # mod_2 = importlib.import_module(p+".module")
+    # pytorch_model = mod_2.transformed_model()
+    pytorch_model = pytorch_model_2
     
     pytorch_model.eval()
     with torch.no_grad():

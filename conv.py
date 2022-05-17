@@ -82,7 +82,7 @@ def transform(m: torch.nn.Module,
             # Set the insert point, add the new node, and replace all uses
             # of `n` with the new node
             with traced.graph.inserting_after(n): 
-                new_node = traced.graph.call_function(torch.bitwise_and, n.args, n.kwargs)
+                new_node = traced.graph.call_function(torch.sub, n.args, n.kwargs)
                 n.replace_all_uses_with(new_node)
             # Remove the old node from the graph
             traced.graph.erase_node(n)           
@@ -234,7 +234,7 @@ for p in subfolders2:
 
         absdiff2 = abs(torch_outputs[0].detach().numpy()-ort_outputs[0]).max()
         print("Comparison result onnx vs onnx:", p, test_result2, absdiff2)
-        compare2onnx(onnx_model, onnx_model2)
+        # compare2onnx(onnx_model, onnx_model2)
     
     
         

@@ -82,7 +82,7 @@ def transform(m: torch.nn.Module,
             # Set the insert point, add the new node, and replace all uses
             # of `n` with the new node
             with traced.graph.inserting_after(n): 
-                new_node = traced.graph.call_function(torch.sub, n.args, n.kwargs)
+                new_node = traced.graph.call_function(torch.sub, n.args, {**n.kwargs, 'alpha': -1.}) #n.kwargs
                 n.replace_all_uses_with(new_node)
             # Remove the old node from the graph
             traced.graph.erase_node(n)           
@@ -194,10 +194,10 @@ for p in subfolders2:
     # from model import Model            
     pytorch_model_1 = mod.Model()
     pytorch_model_2 = transform(pytorch_model_1)
-    # pytorch_model_2.to_folder(dstf, "transformed_model")
-    # mod_2 = importlib.import_module(p+".module")
-    # pytorch_model = mod_2.transformed_model()
-    pytorch_model = pytorch_model_2
+    pytorch_model_2.to_folder(dstf, "transformed_model")
+    mod_2 = importlib.import_module(p+".module")
+    pytorch_model = mod_2.transformed_model()
+    # pytorch_model = pytorch_model_2
     
     pytorch_model.eval()
     with torch.no_grad():

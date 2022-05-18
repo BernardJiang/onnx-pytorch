@@ -50,13 +50,15 @@ def replace_node_module(node: fx.Node, modules: Dict[str, Any], new_module: torc
 
 
 def old_pattern(n_conv_1_zeropad2d, getattr_1):
-    return torch.conv2d(n_conv_1_zeropad2d, getattr_1, None, (2, 2), (0, 0), (1, 1), 1)
+    return torch.conv2d(n_conv_1_zeropad2d, getattr_1, None, (2, 2))
 
 # Define the replacement (same rules as the pattern)
 def replacement(n_conv_1_zeropad2d, getattr_1):
-    input_data = torch.clamp(n_conv_1_zeropad2d, min=-1e+10, max=1e+10)
+    input_data = torch.clamp(n_conv_1_zeropad2d, min=-1.1e+10, max=1e+10)
     weight = torch.clamp(getattr_1, min=-1e+10, max=1e+10)    
-    return torch.conv2d(input_data, weight, None, (2, 2), (0, 0), (1, 1), 1)
+    return torch.conv2d(input_data, weight, None, (2, 2))
+
+
                 
 def transform(m: torch.nn.Module,
               tracer_class : type = torch.fx.Tracer) -> torch.nn.Module:

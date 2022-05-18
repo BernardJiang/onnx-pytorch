@@ -49,12 +49,14 @@ def replace_node_module(node: fx.Node, modules: Dict[str, Any], new_module: torc
     setattr(modules[parent_name], name, new_module)
 
 
-def old_pattern(a1):
-    return torch.nn.Conv2d(a1)
+def old_pattern(n_conv_1_zeropad2d, getattr_1):
+    return torch.conv2d(n_conv_1_zeropad2d, getattr_1, None, (2, 2), (0, 0), (1, 1), 1)
 
 # Define the replacement (same rules as the pattern)
-def replacement(w1):
-    return KQConv2d(w1)
+def replacement(n_conv_1_zeropad2d, getattr_1):
+    input_data = torch.clamp(n_conv_1_zeropad2d, min=-1e+10, max=1e+10)
+    weight = torch.clamp(getattr_1, min=-1e+10, max=1e+10)    
+    return torch.conv2d(input_data, weight, None, (2, 2), (0, 0), (1, 1), 1)
                 
 def transform(m: torch.nn.Module,
               tracer_class : type = torch.fx.Tracer) -> torch.nn.Module:
@@ -73,19 +75,19 @@ def transform(m: torch.nn.Module,
     patterns = set([operator.add, torch.add, "add"])
     
     # Replace `old_pattern` with `replacement` in `traced`
-    # fx.replace_pattern(traced, old_pattern, replacement)
+    fx.replace_pattern(traced, old_pattern, replacement)
 
     # Go through all the nodes in the Graph
-    for n in traced.graph.nodes:
-        # If the target matches one of the patterns
-        if any(n.target == pattern for pattern in patterns):
-            # Set the insert point, add the new node, and replace all uses
-            # of `n` with the new node
-            with traced.graph.inserting_after(n): 
-                new_node = traced.graph.call_function(torch.sub, n.args, {**n.kwargs, 'alpha': -1.}) #n.kwargs
-                n.replace_all_uses_with(new_node)
-            # Remove the old node from the graph
-            traced.graph.erase_node(n)           
+    # for n in traced.graph.nodes:
+    #     # If the target matches one of the patterns
+    #     if any(n.target == pattern for pattern in patterns):
+    #         # Set the insert point, add the new node, and replace all uses
+    #         # of `n` with the new node
+    #         with traced.graph.inserting_after(n): 
+    #             new_node = traced.graph.call_function(torch.sub, n.args, {**n.kwargs, 'alpha': -1.}) #n.kwargs
+    #             n.replace_all_uses_with(new_node)
+    #         # Remove the old node from the graph
+    #         traced.graph.erase_node(n)           
 
     traced.graph.lint()    
     # Step 3: Construct a Module to return

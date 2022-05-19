@@ -43,11 +43,11 @@ from re import search
 from typing import Any, Optional, Dict, Union
 import torch
 import torch.fx
-from aimet_common.utils import AimetLogger
-from aimet_torch.utils import get_device
-import aimet_torch.elementwise_ops as elementwise_ops
+# from aimet_common.utils import AimetLogger
+# from aimet_torch.utils import get_device
+# import aimet_torch.elementwise_ops as elementwise_ops
 
-logger = AimetLogger.get_area_logger(AimetLogger.LogAreas.Quant)
+# logger = AimetLogger.get_area_logger(AimetLogger.LogAreas.Quant)
 
 functional_to_module_map = {
 
@@ -79,17 +79,17 @@ functional_to_module_map = {
     'silu'          : torch.nn.SiLU,
 
     # Elementwise operations
-    'add'           : elementwise_ops.Add,
-    'subtract'      : elementwise_ops.Subtract,
-    'mul'           : elementwise_ops.Multiply,
-    'div'           : elementwise_ops.Divide,
-    'matmul'        : elementwise_ops.MatMul
+    # 'add'           : elementwise_ops.Add,
+    # 'subtract'      : elementwise_ops.Subtract,
+    # 'mul'           : elementwise_ops.Multiply,
+    # 'div'           : elementwise_ops.Divide,
+    # 'matmul'        : elementwise_ops.MatMul
 }
 
 functional_to_module_special_handling_map = {
 
     # Operations that require special transformation
-    'cat'           : elementwise_ops.Concat
+    # 'cat'           : elementwise_ops.Concat
 }
 
 
@@ -124,19 +124,19 @@ def concat_create_module(node: torch.fx.node) -> torch.nn.Module:
     :return:
     """
 
-    num_args = len(node.args)
-    if num_args == 1:
-        # Handle torch.cat being called with default parameter dim
-        kwargs = node.kwargs
-        module = elementwise_ops.Concat()
-    else:
-        module = elementwise_ops.Concat(node.args[1])
-        kwargs = {'axis': node.args[1]}
+    # num_args = len(node.args)
+    # if num_args == 1:
+    #     # Handle torch.cat being called with default parameter dim
+    #     kwargs = node.kwargs
+    #     module = elementwise_ops.Concat()
+    # else:
+    #     module = elementwise_ops.Concat(node.args[1])
+    #     kwargs = {'axis': node.args[1]}
 
-    for key, value in kwargs.items():
-        setattr(module, key, value)
+    # for key, value in kwargs.items():
+    #     setattr(module, key, value)
 
-    return module
+    # return module
 
 
 special_handler_functions = {
@@ -231,7 +231,7 @@ def prepare_model(model: torch.nn.Module, concrete_args: Optional[Dict[str, Any]
     :return: Modified pytorch Model
     """
     model.eval()
-    device = get_device(model)
+    # device = get_device(model)
     # Create a copy of model and keep it on cpu
     model_copy = copy.deepcopy(model).cpu()
 
@@ -252,7 +252,7 @@ def prepare_model(model: torch.nn.Module, concrete_args: Optional[Dict[str, Any]
                 setattr(symbolic_traced_model, new_nodule_name, new_module)
                 # Create the node for new module in the graph
                 _create_node_for_new_module(symbolic_traced_model, node, new_nodule_name, functional_name)
-                logger.info("Functional         : Adding new module for node: {%s} ", node.name)
+                # logger.info("Functional         : Adding new module for node: {%s} ", node.name)
 
         # Create new module for reused/duplicate nodes
         elif node.target in unique_nodes:
@@ -271,7 +271,7 @@ def prepare_model(model: torch.nn.Module, concrete_args: Optional[Dict[str, Any]
     _verify_symbolic_traced_model(symbolic_traced_model)
 
     symbolic_traced_model.eval()
-    symbolic_traced_model.to(device)
+    # symbolic_traced_model.to(device)
     return symbolic_traced_model
 
 

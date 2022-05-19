@@ -13,6 +13,7 @@ from torch.onnx import ONNX_ARCHIVE_MODEL_PROTO_NAME, ExportTypes, OperatorExpor
 from kqconv import KQConv2d
 from typing import Type, Dict, Any, Tuple, Iterable, Optional, List, cast
 import operator
+from model_preparer import prepare_model
 
 onnx_source_folder = '/workspace/develop/dataset/model_source/big_model/model_share_0923_opset11/'
 o2p_dst_folder = '/workspace/develop/dataset/o2p_models/'
@@ -198,7 +199,8 @@ for p in subfolders2:
     # from model import Model            
     pytorch_model_1 = mod.Model()
     pytorch_model_2 = transform(pytorch_model_1)
-    pytorch_model_2.to_folder(dstf, "transformed_model")
+    pytorch_model_3 = prepare_model(pytorch_model_2)
+    pytorch_model_3.to_folder(dstf, "transformed_model")
     mod_2 = importlib.import_module(p+".module")
     pytorch_model = mod_2.transformed_model()
     # pytorch_model = pytorch_model_2

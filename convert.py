@@ -14,8 +14,8 @@ from kqconv import KQConv2d
 from typing import Type, Dict, Any, Tuple, Iterable, Optional, List, cast
 import operator
 
-onnx_source_folder = '/workspace/develop/model_source/big_model/model_share_0923_opset11/'
-o2p_dst_folder = '/workspace/develop/o2p_models/'
+onnx_source_folder = '/workspace/develop/dataset/model_source/big_model/model_share_0923_opset11/'
+o2p_dst_folder = '/workspace/develop/dataset/o2p_models/'
 
 sys.path.append(o2p_dst_folder)
 
@@ -77,19 +77,19 @@ def transform(m: torch.nn.Module,
     patterns = set([operator.add, torch.add, "add"])
     
     # Replace `old_pattern` with `replacement` in `traced`
-    fx.replace_pattern(traced, old_pattern, replacement)
+    # fx.replace_pattern(traced, old_pattern, replacement)
 
     # Go through all the nodes in the Graph
-    # for n in traced.graph.nodes:
-    #     # If the target matches one of the patterns
-    #     if any(n.target == pattern for pattern in patterns):
-    #         # Set the insert point, add the new node, and replace all uses
-    #         # of `n` with the new node
-    #         with traced.graph.inserting_after(n): 
-    #             new_node = traced.graph.call_function(torch.sub, n.args, {**n.kwargs, 'alpha': -1.}) #n.kwargs
-    #             n.replace_all_uses_with(new_node)
-    #         # Remove the old node from the graph
-    #         traced.graph.erase_node(n)           
+    for n in traced.graph.nodes:
+        # If the target matches one of the patterns
+        if any(n.target == pattern for pattern in patterns):
+            # Set the insert point, add the new node, and replace all uses
+            # of `n` with the new node
+            with traced.graph.inserting_after(n): 
+                new_node = traced.graph.call_function(torch.sub, n.args, {**n.kwargs, 'alpha': -1.}) #n.kwargs
+                n.replace_all_uses_with(new_node)
+            # Remove the old node from the graph
+            traced.graph.erase_node(n)           
 
     traced.graph.lint()    
     # Step 3: Construct a Module to return
